@@ -763,6 +763,7 @@ body {
 }
 
 /* ===== Responsive Design ===== */
+/* Базовая адаптация, далее расширяем под разные устройства */
 @media (max-width: 768px) {
     .menu-toggle {
         display: flex;
@@ -825,6 +826,161 @@ body {
     .practice-tab.active {
         border-left-color: var(--primary-color);
     }
+
+    .main-content {
+        padding: 1.5rem 1rem;
+    }
+
+    .about-section {
+        padding: 2rem 1.5rem;
+        margin: 0 0.5rem;
+    }
+
+    .quiz-container,
+    .sentence-builder {
+        padding: 1.5rem;
+    }
+
+    .progress-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-value {
+        font-size: 2.2rem;
+    }
+}
+
+/* Очень маленькие экраны (телефоны до 480px) */
+@media (max-width: 480px) {
+    .nav-container {
+        padding: 0 1rem;
+    }
+
+    .logo h1 {
+        font-size: 1.25rem;
+    }
+
+    .hero {
+        padding: 3rem 1.5rem;
+        border-radius: 16px;
+    }
+
+    .hero h1 {
+        font-size: 1.6rem;
+    }
+
+    .hero p {
+        font-size: 0.95rem;
+    }
+
+    .cta-button {
+        width: 100%;
+        text-align: center;
+        padding: 0.9rem 1.4rem;
+        font-size: 1rem;
+    }
+
+    h1,
+    h2 {
+        font-size: 1.6rem !important;
+    }
+
+    .cards-grid {
+        gap: 1.5rem;
+    }
+
+    .card {
+        padding: 1.5rem;
+    }
+
+    .vocab-card {
+        height: auto;
+        min-height: 260px;
+        padding: 1.5rem;
+    }
+
+    .word {
+        font-size: 1.6rem;
+    }
+
+    .translation {
+        font-size: 1.3rem;
+    }
+
+    .examples-table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .examples-table table {
+        width: 100%;
+        min-width: 400px;
+    }
+
+    .quiz-container {
+        padding: 1.25rem;
+    }
+
+    .quiz-btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    .practice-tabs {
+        gap: 0.5rem;
+    }
+
+    .practice-tab {
+        padding: 0.7rem 1rem;
+        text-align: left;
+    }
+
+    .words-pool,
+    .sentence-area {
+        padding: 1.2rem;
+    }
+
+    .footer {
+        padding: 1.5rem 0;
+    }
+}
+
+/* Планшеты и небольшие ноутбуки (768px–1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .nav-container {
+        padding: 0 2rem;
+    }
+
+    .main-content {
+        padding: 2.5rem 2rem;
+    }
+
+    .hero {
+        padding: 3.5rem 2.5rem;
+    }
+
+    .cards-grid {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .quiz-container,
+    .sentence-builder,
+    .about-section {
+        padding: 2.5rem;
+    }
+}
+
+/* Общие улучшения для таблиц и медиа-контента */
+img,
+video {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+.examples-table {
+    border-radius: 10px;
 }
 
 /* ===== Loading State ===== */
