@@ -1,13 +1,48 @@
 <section class="vocabulary-section">
-    <h1 style="text-align: center; margin-bottom: 2rem; color: var(--text-dark); font-size: 2.5rem;">Словарь</h1>
+    <h1 style="text-align: center; margin-bottom: 1rem; color: var(--text-dark); font-size: 2.5rem;">Словарь</h1>
     <p style="text-align: center; color: var(--text-light); margin-bottom: 2rem;">Изучайте новые слова, кликая на карточки для просмотра перевода и примера</p>
     
-    <div class="category-filter" id="categoryFilter">
-        <!-- Кнопки фильтрации будут добавлены через JS -->
+    <!-- Поиск -->
+    <div class="search-container">
+        <input type="text" 
+               id="wordSearch" 
+               class="search-input" 
+               placeholder="🔍 Поиск по словам, переводам или примерам...">
     </div>
     
+    <!-- Режимы обучения -->
+    <div style="text-align: center; margin-bottom: 1.5rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <button id="toggleStudyMode" class="study-mode-toggle-btn">📖 Режим изучения</button>
+        <button id="reviewLearnedBtn" class="study-mode-toggle-btn" style="background: linear-gradient(135deg, var(--success-color), var(--accent-color));">🔄 Повторить изученные</button>
+        <button id="randomWordsBtn" class="study-mode-toggle-btn" style="background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));">🎲 Случайные слова</button>
+    </div>
+    
+    <!-- Контейнер режима изучения -->
+    <div id="studyModeContainer" style="display: none;"></div>
+    
+    <!-- Фильтры по уровням CEFR -->
+    <div style="margin-bottom: 1.5rem;">
+        <h3 style="color: var(--text-dark); margin-bottom: 1rem; font-size: 1.2rem;">Уровни CEFR:</h3>
+        <div class="level-filter" id="levelFilter">
+            <!-- Кнопки фильтрации по уровням будут добавлены через JS -->
+        </div>
+    </div>
+    
+    <!-- Фильтры по категориям -->
+    <div style="margin-bottom: 1.5rem;">
+        <h3 style="color: var(--text-dark); margin-bottom: 1rem; font-size: 1.2rem;">Категории:</h3>
+        <div class="category-filter" id="categoryFilter">
+            <!-- Кнопки фильтрации будут добавлены через JS -->
+        </div>
+    </div>
+    
+    <!-- Счетчик слов и статистика -->
+    <div id="wordsCounter" style="text-align: center; margin-bottom: 1rem; color: var(--text-light); font-weight: 500;">
+        Найдено слов: 0
+    </div>
+    
+    <!-- Сетка карточек -->
     <div class="cards-grid" id="vocabularyGrid">
         <!-- Карточки слов будут добавлены через JS -->
     </div>
 </section>
-

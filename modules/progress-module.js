@@ -1,6 +1,7 @@
 // Модуль для отображения прогресса пользователя
 
 import { getFromLocalStorage } from '../script.js';
+import { wordsData, cefrLevels } from '../data/words-data.js';
 
 export function initProgress() {
     renderProgress();
@@ -10,7 +11,8 @@ function renderProgress() {
     const stats = getFromLocalStorage('progressStats', {
         wordsLearned: 0,
         lessonsCompleted: 0,
-        quizBestScore: 0
+        quizBestScore: 0,
+        wordsByLevel: {}
     });
 
     const learnedWords = getFromLocalStorage('learnedWords', []);
@@ -19,16 +21,30 @@ function renderProgress() {
     // Обновляем статистику
     stats.wordsLearned = learnedWords.length;
     stats.lessonsCompleted = completedLessons.length;
+    
+    // Статистика по уровням
+    stats.wordsByLevel = {};
+    cefrLevels.forEach(level => {
+        if (level.id !== 'all') {
+            const levelWords = wordsData.filter(w => w.level === level.id);
+            const learnedLevelWords = levelWords.filter(w => learnedWords.includes(w.id));
+            stats.wordsByLevel[level.id] = {
+                total: levelWords.length,
+                learned: learnedLevelWords.length
+            };
+        }
+    });
 
-    renderStatsCards(stats);
+    renderStatsCards(stats, learnedWords.length);
     renderDetailedProgress(stats, learnedWords, completedLessons);
+    renderLevelProgress(stats.wordsByLevel);
 }
 
-function renderStatsCards(stats) {
+function renderStatsCards(stats, totalLearned) {
     const container = document.getElementById('progressStats');
     if (!container) return;
 
-    const totalWords = 25; // Общее количество слов в словаре
+    const totalWords = wordsData.length;
     const totalLessons = 6; // Общее количество уроков грамматики
     const totalQuizScore = 100; // Максимальный балл викторины
 
@@ -74,12 +90,52 @@ function renderStatsCards(stats) {
     `;
 }
 
+function renderLevelProgress(wordsByLevel) {
+    const container = document.getElementById('levelProgress');
+    if (!container) return;
+    
+    container.innerHTML = `
+        <h3 style="color: var(--primary-color); margin-bottom: 1.5rem; font-size: 1.5rem;">Прогресс по уровням CEFR</h3>
+        <div style="display: grid; gap: 1.5rem;">
+            ${cefrLevels.filter(l => l.id !== 'all').map(level => {
+                const levelData = wordsByLevel[level.id] || { total: 0, learned: 0 };
+                const percentage = levelData.total > 0 
+                    ? Math.round((levelData.learned / levelData.total) * 100) 
+                    : 0;
+                
+                return `
+                    <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 10px; border-left: 4px solid ${level.color};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                            <div>
+                                <span class="level-badge level-${level.id}" style="margin: 0; margin-right: 0.5rem;">
+                                    ${level.id}
+                                </span>
+                                <span style="font-weight: 600; color: var(--text-dark);">${level.name.split(' - ')[1]}</span>
+                            </div>
+                            <span style="font-weight: 700; color: ${level.color}; font-size: 1.2rem;">
+                                ${levelData.learned} / ${levelData.total}
+                            </span>
+                        </div>
+                        <div class="progress-bar-container" style="height: 25px;">
+                            <div class="progress-bar" style="width: ${percentage}%; background: linear-gradient(90deg, ${level.color}, ${level.color}dd);">
+                                ${percentage}%
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
 function renderDetailedProgress(stats, learnedWords, completedLessons) {
     const container = document.getElementById('detailedProgress');
     if (!container) return;
 
+    const totalWords = wordsData.length;
+    const totalLessons = 6;
     const completionRate = Math.round(
-        ((stats.wordsLearned / 25) + (stats.lessonsCompleted / 6) + (stats.quizBestScore / 100)) / 3 * 100
+        ((stats.wordsLearned / totalWords) + (stats.lessonsCompleted / totalLessons) + (stats.quizBestScore / 100)) / 3 * 100
     );
 
     container.innerHTML = `
@@ -99,12 +155,12 @@ function renderDetailedProgress(stats, learnedWords, completedLessons) {
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                         <span style="font-weight: 600;">Словарь</span>
                         <span style="color: var(--text-light);">
-                            ${stats.wordsLearned} / 25 слов изучено
+                            ${stats.wordsLearned} / ${totalWords} слов изучено
                         </span>
                     </div>
                     <div class="progress-bar-container">
-                        <div class="progress-bar" style="width: ${(stats.wordsLearned / 25) * 100}%;">
-                            ${Math.round((stats.wordsLearned / 25) * 100)}%
+                        <div class="progress-bar" style="width: ${(stats.wordsLearned / totalWords) * 100}%;">
+                            ${Math.round((stats.wordsLearned / totalWords) * 100)}%
                         </div>
                     </div>
                 </div>
@@ -113,12 +169,12 @@ function renderDetailedProgress(stats, learnedWords, completedLessons) {
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                         <span style="font-weight: 600;">Грамматика</span>
                         <span style="color: var(--text-light);">
-                            ${stats.lessonsCompleted} / 6 уроков пройдено
+                            ${stats.lessonsCompleted} / ${totalLessons} уроков пройдено
                         </span>
                     </div>
                     <div class="progress-bar-container">
-                        <div class="progress-bar" style="width: ${(stats.lessonsCompleted / 6) * 100}%;">
-                            ${Math.round((stats.lessonsCompleted / 6) * 100)}%
+                        <div class="progress-bar" style="width: ${(stats.lessonsCompleted / totalLessons) * 100}%;">
+                            ${Math.round((stats.lessonsCompleted / totalLessons) * 100)}%
                         </div>
                     </div>
                 </div>
@@ -154,16 +210,36 @@ function renderDetailedProgress(stats, learnedWords, completedLessons) {
 
 function getAchievements(stats, learnedWords, completedLessons) {
     const achievements = [];
+    const totalWords = wordsData.length;
     
-    if (stats.wordsLearned >= 5) {
-        achievements.push({ icon: '🎯', text: 'Начинающий: Изучено 5+ слов' });
-    }
     if (stats.wordsLearned >= 10) {
-        achievements.push({ icon: '📚', text: 'Любознательный: Изучено 10+ слов' });
+        achievements.push({ icon: '🎯', text: 'Начинающий: Изучено 10+ слов' });
     }
-    if (stats.wordsLearned >= 20) {
-        achievements.push({ icon: '🌟', text: 'Энтузиаст: Изучено 20+ слов' });
+    if (stats.wordsLearned >= 25) {
+        achievements.push({ icon: '📚', text: 'Любознательный: Изучено 25+ слов' });
     }
+    if (stats.wordsLearned >= 50) {
+        achievements.push({ icon: '🌟', text: 'Энтузиаст: Изучено 50+ слов' });
+    }
+    if (stats.wordsLearned >= 75) {
+        achievements.push({ icon: '🏆', text: 'Эксперт: Изучено 75+ слов' });
+    }
+    if (stats.wordsLearned >= totalWords * 0.9) {
+        achievements.push({ icon: '👑', text: 'Мастер: Изучено 90%+ слов!' });
+    }
+    
+    // Достижения по уровням
+    const wordsByLevel = stats.wordsByLevel || {};
+    Object.keys(wordsByLevel).forEach(level => {
+        const levelData = wordsByLevel[level];
+        if (levelData.total > 0 && levelData.learned >= levelData.total * 0.8) {
+            achievements.push({ 
+                icon: '⭐', 
+                text: `Уровень ${level}: Изучено 80%+ слов` 
+            });
+        }
+    });
+    
     if (stats.lessonsCompleted >= 3) {
         achievements.push({ icon: '📖', text: 'Ученик: Пройдено 3+ урока' });
     }
@@ -179,4 +255,3 @@ function getAchievements(stats, learnedWords, completedLessons) {
     
     return achievements.length > 0 ? achievements : [{ icon: '🚀', text: 'Начните обучение, чтобы получить достижения!' }];
 }
-

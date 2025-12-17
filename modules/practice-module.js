@@ -1,18 +1,21 @@
-// Модуль для практических упражнений (Викторина, Аудирование, Конструктор предложений)
+// Модуль для практических упражнений (Викторина, Аудирование)
 
-import { quizData, listeningData, sentenceBuilderData } from '../data/quiz-data.js';
+import { quizData, quizDataByLevel, listeningData, listeningDataByLevel } from '../data/quiz-data.js';
 import { speakText, saveToLocalStorage, getFromLocalStorage } from '../script.js';
+import { cefrLevels } from '../data/words-data.js';
 
+let currentQuizLevel = null;
+let currentQuizData = [];
 let currentQuizIndex = 0;
 let quizScore = 0;
 let currentQuizAnswers = [];
-let currentSentenceIndex = 0;
+let currentListeningLevel = null;
+let currentListeningIndex = 0;
 
 export function initPractice() {
     initTabs();
     initQuiz();
     initListening();
-    initSentenceBuilder();
 }
 
 // Инициализация вкладок
@@ -40,6 +43,103 @@ function initTabs() {
 
 // ===== ВИКТОРИНА =====
 function initQuiz() {
+    renderQuizLevelSelection();
+}
+
+function renderQuizLevelSelection() {
+    const container = document.getElementById('quizContent');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="quiz-container">
+            <h2 style="text-align: center; margin-bottom: 2rem; color: var(--text-dark);">
+                Выберите уровень для викторины
+            </h2>
+            <p style="text-align: center; margin-bottom: 2rem; color: var(--text-light);">
+                Викторина поможет проверить ваши знания на разных уровнях CEFR
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                ${cefrLevels.filter(l => l.id !== 'all' && quizDataByLevel[l.id] && quizDataByLevel[l.id].length > 0).map(level => {
+                    const levelData = quizDataByLevel[level.id];
+                    const stats = getFromLocalStorage('quizLevelStats', {});
+                    const bestScore = stats[level.id]?.bestScore || 0;
+                    return `
+                        <div class="level-quiz-card" data-level="${level.id}" style="
+                            padding: 2rem;
+                            background: var(--bg-white);
+                            border-radius: 15px;
+                            box-shadow: var(--shadow);
+                            text-align: center;
+                            cursor: pointer;
+                            transition: var(--transition);
+                            border: 3px solid ${level.color}40;
+                        ">
+                            <div class="level-badge level-${level.id}" style="margin-bottom: 1rem;">
+                                ${level.id}
+                            </div>
+                            <h3 style="color: var(--text-dark); margin-bottom: 0.5rem;">${level.name.split(' - ')[1]}</h3>
+                            <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 1rem;">
+                                ${levelData.length} вопросов
+                            </p>
+                            ${bestScore > 0 ? `
+                                <p style="color: ${level.color}; font-weight: 600; font-size: 0.9rem;">
+                                    Лучший результат: ${bestScore}%
+                                </p>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            <div style="text-align: center;">
+                <button class="quiz-btn secondary" id="quizProgressiveMode" style="padding: 1rem 2rem;">
+                    📈 Постепенное прохождение (начните с A1)
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Обработчики выбора уровня
+    container.querySelectorAll('.level-quiz-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const level = card.dataset.level;
+            startQuiz(level);
+        });
+    });
+
+    // Режим постепенного прохождения
+    const progressiveBtn = container.querySelector('#quizProgressiveMode');
+    if (progressiveBtn) {
+        progressiveBtn.addEventListener('click', () => {
+            startProgressiveQuiz();
+        });
+    }
+}
+
+function startProgressiveQuiz() {
+    const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+    const stats = getFromLocalStorage('quizLevelStats', {});
+    
+    // Находим первый уровень, который не пройден на 80%+
+    for (const level of levels) {
+        if (quizDataByLevel[level] && quizDataByLevel[level].length > 0) {
+            const levelStats = stats[level] || { bestScore: 0 };
+            if (levelStats.bestScore < 80) {
+                startQuiz(level);
+                return;
+            }
+        }
+    }
+    
+    // Если все уровни пройдены, начинаем с A1
+    startQuiz('A1');
+}
+
+function startQuiz(level) {
+    currentQuizLevel = level;
+    currentQuizData = quizDataByLevel[level] || [];
+    currentQuizIndex = 0;
+    quizScore = 0;
+    currentQuizAnswers = [];
     renderQuiz();
 }
 
@@ -47,12 +147,26 @@ function renderQuiz() {
     const container = document.getElementById('quizContent');
     if (!container) return;
 
-    if (currentQuizIndex < quizData.length) {
+    if (currentQuizData.length === 0) {
+        renderQuizLevelSelection();
+        return;
+    }
+
+    if (currentQuizIndex < currentQuizData.length) {
         const question = quizData[currentQuizIndex];
+        const levelInfo = cefrLevels.find(l => l.id === currentQuizLevel);
         container.innerHTML = `
             <div class="quiz-container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div class="level-badge level-${currentQuizLevel}" style="margin: 0;">
+                        ${currentQuizLevel}
+                    </div>
+                    <button class="quiz-btn secondary" id="exitQuiz" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
+                        Выйти
+                    </button>
+                </div>
                 <div class="question-counter">
-                    Вопрос ${currentQuizIndex + 1} из ${quizData.length}
+                    Вопрос ${currentQuizIndex + 1} из ${currentQuizData.length}
                 </div>
                 <h2 class="question-title">${question.question}</h2>
                 <div class="quiz-options">
@@ -67,7 +181,7 @@ function renderQuiz() {
                         Назад
                     </button>
                     <button class="quiz-btn primary" id="nextBtn">
-                        ${currentQuizIndex === quizData.length - 1 ? 'Завершить' : 'Следующий'}
+                        ${currentQuizIndex === currentQuizData.length - 1 ? 'Завершить' : 'Следующий'}
                     </button>
                 </div>
             </div>
@@ -106,18 +220,18 @@ function renderQuiz() {
         const nextBtn = container.querySelector('#nextBtn');
         if (nextBtn) {
             nextBtn.addEventListener('click', () => {
-                if (currentQuizIndex < quizData.length - 1) {
+                if (currentQuizIndex < currentQuizData.length - 1) {
                     // Показываем правильность ответа
                     const selectedOption = container.querySelector('.quiz-option.selected');
                     if (selectedOption) {
                         const selectedIndex = parseInt(selectedOption.dataset.index);
-                        const correctIndex = quizData[currentQuizIndex].correctAnswer;
+                        const correctIndex = currentQuizData[currentQuizIndex].correctAnswer;
                         
                         selectedOption.classList.add(selectedIndex === correctIndex ? 'correct' : 'incorrect');
                         container.querySelectorAll('.quiz-option')[correctIndex].classList.add('correct');
                         
                         if (selectedIndex === correctIndex) {
-                            quizScore += quizData[currentQuizIndex].points;
+                            quizScore += currentQuizData[currentQuizIndex].points;
                         }
 
                         setTimeout(() => {
@@ -132,13 +246,13 @@ function renderQuiz() {
                     const selectedOption = container.querySelector('.quiz-option.selected');
                     if (selectedOption) {
                         const selectedIndex = parseInt(selectedOption.dataset.index);
-                        const correctIndex = quizData[currentQuizIndex].correctAnswer;
+                        const correctIndex = currentQuizData[currentQuizIndex].correctAnswer;
                         
                         selectedOption.classList.add(selectedIndex === correctIndex ? 'correct' : 'incorrect');
                         container.querySelectorAll('.quiz-option')[correctIndex].classList.add('correct');
                         
                         if (selectedIndex === correctIndex) {
-                            quizScore += quizData[currentQuizIndex].points;
+                            quizScore += currentQuizData[currentQuizIndex].points;
                         }
                         
                         setTimeout(() => {
@@ -155,6 +269,16 @@ function renderQuiz() {
         if (currentQuizAnswers[currentQuizIndex] !== undefined) {
             container.querySelectorAll('.quiz-option')[currentQuizAnswers[currentQuizIndex]].classList.add('selected');
         }
+
+        // Кнопка выхода
+        const exitBtn = container.querySelector('#exitQuiz');
+        if (exitBtn) {
+            exitBtn.addEventListener('click', () => {
+                if (confirm('Вы уверены, что хотите выйти? Прогресс не будет сохранен.')) {
+                    renderQuizLevelSelection();
+                }
+            });
+        }
     }
 }
 
@@ -162,69 +286,188 @@ function finishQuiz() {
     const container = document.getElementById('quizContent');
     if (!container) return;
 
+    const maxScore = currentQuizData.reduce((sum, q) => sum + q.points, 0);
     const totalScore = quizScore;
-    const percentage = Math.round((totalScore / (quizData.length * 10)) * 100);
+    const percentage = Math.round((totalScore / maxScore) * 100);
+    const levelInfo = cefrLevels.find(l => l.id === currentQuizLevel);
 
     container.innerHTML = `
         <div class="quiz-container">
             <div class="quiz-result">
+                <div class="level-badge level-${currentQuizLevel}" style="margin: 0 auto 1rem;">
+                    ${currentQuizLevel}
+                </div>
                 <h2>Викторина завершена!</h2>
-                <div class="quiz-score">${totalScore} / ${quizData.length * 10}</div>
+                <div class="quiz-score">${totalScore} / ${maxScore}</div>
                 <p style="font-size: 1.2rem; margin-bottom: 2rem;">
                     Правильных ответов: ${percentage}%
                 </p>
-                <div class="quiz-controls">
-                    <button class="quiz-btn primary" id="restartQuiz">Начать заново</button>
+                ${percentage >= 80 ? `
+                    <div style="padding: 1rem; background: rgba(39, 174, 96, 0.1); border-radius: 10px; margin-bottom: 2rem; color: var(--success-color);">
+                        🎉 Отлично! Вы можете перейти к следующему уровню!
+                    </div>
+                ` : ''}
+                <div class="quiz-controls" style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <button class="quiz-btn secondary" id="restartQuiz">Повторить</button>
+                    <button class="quiz-btn primary" id="nextLevelQuiz">Следующий уровень</button>
+                    <button class="quiz-btn secondary" id="backToLevels">Выбрать уровень</button>
                 </div>
             </div>
         </div>
     `;
 
-    // Сохраняем лучший результат
+    // Сохраняем статистику по уровням
+    const levelStats = getFromLocalStorage('quizLevelStats', {});
+    if (!levelStats[currentQuizLevel] || percentage > levelStats[currentQuizLevel].bestScore) {
+        levelStats[currentQuizLevel] = {
+            bestScore: percentage,
+            lastScore: percentage,
+            completed: true
+        };
+    } else {
+        levelStats[currentQuizLevel].lastScore = percentage;
+    }
+    saveToLocalStorage('quizLevelStats', levelStats);
+
+    // Общая статистика
     const stats = getFromLocalStorage('progressStats', {
         wordsLearned: 0,
         lessonsCompleted: 0,
         quizBestScore: 0
     });
     
-    if (totalScore > stats.quizBestScore) {
-        stats.quizBestScore = totalScore;
+    const overallBest = Math.max(...Object.values(levelStats).map(s => s.bestScore));
+    if (overallBest > stats.quizBestScore) {
+        stats.quizBestScore = overallBest;
         saveToLocalStorage('progressStats', stats);
     }
 
-    // Кнопка перезапуска
-    const restartBtn = container.querySelector('#restartQuiz');
-    if (restartBtn) {
-        restartBtn.addEventListener('click', () => {
-            currentQuizIndex = 0;
-            quizScore = 0;
-            currentQuizAnswers = [];
-            renderQuiz();
-        });
+    // Кнопки
+    container.querySelector('#restartQuiz').addEventListener('click', () => {
+        currentQuizIndex = 0;
+        quizScore = 0;
+        currentQuizAnswers = [];
+        renderQuiz();
+    });
+
+    const nextLevelBtn = container.querySelector('#nextLevelQuiz');
+    if (nextLevelBtn) {
+        const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+        const currentIndex = levels.indexOf(currentQuizLevel);
+        if (currentIndex < levels.length - 1 && quizDataByLevel[levels[currentIndex + 1]]) {
+            nextLevelBtn.addEventListener('click', () => {
+                startQuiz(levels[currentIndex + 1]);
+            });
+        } else {
+            nextLevelBtn.style.display = 'none';
+        }
     }
+
+    container.querySelector('#backToLevels').addEventListener('click', () => {
+        renderQuizLevelSelection();
+    });
 }
 
 // ===== АУДИРОВАНИЕ =====
 function initListening() {
-    renderListening();
+    renderListeningLevelSelection();
+}
+
+function renderListeningLevelSelection() {
+    const container = document.getElementById('listeningContent');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="quiz-container">
+            <h2 style="text-align: center; margin-bottom: 2rem; color: var(--text-dark);">
+                Выберите уровень для аудирования
+            </h2>
+            <p style="text-align: center; margin-bottom: 2rem; color: var(--text-light);">
+                Прослушайте диалог и ответьте на вопросы
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                ${cefrLevels.filter(l => l.id !== 'all' && listeningDataByLevel[l.id] && listeningDataByLevel[l.id].length > 0).map(level => {
+                    const levelDialogs = listeningDataByLevel[level.id];
+                    return `
+                        <div class="level-listening-card" data-level="${level.id}" style="
+                            padding: 2rem;
+                            background: var(--bg-white);
+                            border-radius: 15px;
+                            box-shadow: var(--shadow);
+                            text-align: center;
+                            cursor: pointer;
+                            transition: var(--transition);
+                            border: 3px solid ${level.color}40;
+                        ">
+                            <div class="level-badge level-${level.id}" style="margin-bottom: 1rem;">
+                                ${level.id}
+                            </div>
+                            <h3 style="color: var(--text-dark); margin-bottom: 0.5rem;">${level.name.split(' - ')[1]}</h3>
+                            <p style="color: var(--text-light); font-size: 0.9rem;">
+                                ${levelDialogs.length} диалог${levelDialogs.length > 1 ? 'ов' : ''}
+                            </p>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+
+    // Обработчики выбора уровня
+    container.querySelectorAll('.level-listening-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const level = card.dataset.level;
+            currentListeningLevel = level;
+            currentListeningIndex = 0;
+            renderListening();
+        });
+    });
 }
 
 function renderListening() {
     const container = document.getElementById('listeningContent');
     if (!container) return;
 
-    const listening = listeningData[0]; // Используем первый диалог
+    if (!currentListeningLevel || !listeningDataByLevel[currentListeningLevel]) {
+        renderListeningLevelSelection();
+        return;
+    }
+
+    const levelDialogs = listeningDataByLevel[currentListeningLevel];
+    if (currentListeningIndex >= levelDialogs.length) {
+        currentListeningIndex = 0;
+    }
+
+    const listening = levelDialogs[currentListeningIndex];
+    const levelInfo = cefrLevels.find(l => l.id === currentListeningLevel);
     container.innerHTML = `
         <div class="quiz-container">
-            <h2 style="margin-bottom: 1.5rem; color: var(--text-dark);">${listening.title}</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div class="level-badge level-${currentListeningLevel}" style="margin: 0;">
+                    ${currentListeningLevel}
+                </div>
+                <button class="quiz-btn secondary" id="exitListening" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
+                    Выйти
+                </button>
+            </div>
+            <h2 style="margin-bottom: 1rem; color: var(--text-dark);">${listening.title}</h2>
             <p style="margin-bottom: 2rem; color: var(--text-light);">
-                Прослушайте текст и ответьте на вопросы
+                Диалог ${currentListeningIndex + 1} из ${levelDialogs.length}
             </p>
             
             <div style="text-align: center; margin-bottom: 2rem;">
                 <button class="quiz-btn primary" id="playAudio" style="font-size: 1.1rem; padding: 1.2rem 3rem;">
                     🔊 Проиграть аудио
                 </button>
+                <button class="quiz-btn secondary" id="playAudioAgain" style="font-size: 1rem; padding: 1rem 2rem; margin-left: 1rem;">
+                    🔁 Повторить
+                </button>
+            </div>
+            
+            <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 10px; margin-bottom: 2rem;">
+                <p style="color: var(--text-dark); line-height: 1.8; font-size: 1.05rem;">
+                    ${listening.text}
+                </p>
             </div>
             
             <div class="quiz-options" id="listeningQuestions">
@@ -244,8 +487,12 @@ function renderListening() {
                 `).join('')}
             </div>
             
-            <div style="text-align: center; margin-top: 2rem;">
+            <div style="text-align: center; margin-top: 2rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
                 <button class="quiz-btn primary" id="checkListening">Проверить ответы</button>
+                ${levelDialogs.length > 1 ? `
+                    ${currentListeningIndex > 0 ? '<button class="quiz-btn secondary" id="prevDialog">← Предыдущий</button>' : ''}
+                    ${currentListeningIndex < levelDialogs.length - 1 ? '<button class="quiz-btn secondary" id="nextDialog">Следующий →</button>' : ''}
+                ` : ''}
             </div>
             
             <div id="listeningFeedback" style="margin-top: 2rem;"></div>
@@ -253,9 +500,43 @@ function renderListening() {
     `;
 
     // Обработчик проигрывания аудио
-    container.querySelector('#playAudio').addEventListener('click', () => {
-        speakText(listening.text, 'en-US');
-    });
+    const playAudio = () => speakText(listening.text, 'en-US');
+    
+    container.querySelector('#playAudio').addEventListener('click', playAudio);
+    
+    const playAgainBtn = container.querySelector('#playAudioAgain');
+    if (playAgainBtn) {
+        playAgainBtn.addEventListener('click', playAudio);
+    }
+
+    // Кнопка выхода
+    const exitBtn = container.querySelector('#exitListening');
+    if (exitBtn) {
+        exitBtn.addEventListener('click', () => {
+            renderListeningLevelSelection();
+        });
+    }
+
+    // Навигация по диалогам
+    const prevDialogBtn = container.querySelector('#prevDialog');
+    if (prevDialogBtn) {
+        prevDialogBtn.addEventListener('click', () => {
+            if (currentListeningIndex > 0) {
+                currentListeningIndex--;
+                renderListening();
+            }
+        });
+    }
+
+    const nextDialogBtn = container.querySelector('#nextDialog');
+    if (nextDialogBtn) {
+        nextDialogBtn.addEventListener('click', () => {
+            if (currentListeningIndex < levelDialogs.length - 1) {
+                currentListeningIndex++;
+                renderListening();
+            }
+        });
+    }
 
     // Обработчики выбора ответов
     container.querySelectorAll('.listening-option').forEach(option => {
@@ -307,166 +588,4 @@ function checkListeningAnswers(listening, container) {
     `;
 }
 
-// ===== КОНСТРУКТОР ПРЕДЛОЖЕНИЙ =====
-function initSentenceBuilder() {
-    renderSentenceBuilder();
-}
-
-function renderSentenceBuilder() {
-    const container = document.getElementById('sentenceBuilderContent');
-    if (!container) return;
-
-    const sentenceData = sentenceBuilderData[currentSentenceIndex];
-    const shuffledWords = [...sentenceData.words].sort(() => Math.random() - 0.5);
-
-    container.innerHTML = `
-        <div class="sentence-builder">
-            <h2 style="margin-bottom: 1rem; color: var(--text-dark);">
-                Задание ${currentSentenceIndex + 1} из ${sentenceBuilderData.length}
-            </h2>
-            <p style="margin-bottom: 2rem; color: var(--text-light);">
-                ${sentenceData.hint}
-            </p>
-            
-            <div class="words-pool" id="wordsPool">
-                ${shuffledWords.map(word => `
-                    <div class="word-chip" draggable="true" data-word="${word}">
-                        ${word}
-                    </div>
-                `).join('')}
-            </div>
-            
-            <div class="sentence-area" id="sentenceArea">
-                <p style="color: var(--text-light);">Перетащите слова сюда, чтобы составить предложение</p>
-            </div>
-            
-            <div style="display: flex; gap: 1rem; margin-top: 2rem; justify-content: center;">
-                <button class="quiz-btn secondary" id="clearSentence">Очистить</button>
-                <button class="quiz-btn primary" id="checkSentence">Проверить</button>
-                ${currentSentenceIndex < sentenceBuilderData.length - 1 
-                    ? '<button class="quiz-btn secondary" id="nextSentence">Следующее задание</button>'
-                    : ''
-                }
-            </div>
-            
-            <div id="sentenceFeedback" style="margin-top: 2rem;"></div>
-        </div>
-    `;
-
-    initDragAndDrop(sentenceData);
-}
-
-function initDragAndDrop(sentenceData) {
-    const wordsPool = document.getElementById('wordsPool');
-    const sentenceArea = document.getElementById('sentenceArea');
-    const chips = wordsPool.querySelectorAll('.word-chip');
-    let draggedElement = null;
-    const droppedWords = [];
-
-    // Drag start
-    chips.forEach(chip => {
-        chip.addEventListener('dragstart', (e) => {
-            draggedElement = chip;
-            chip.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-        });
-
-        chip.addEventListener('dragend', () => {
-            chip.classList.remove('dragging');
-        });
-    });
-
-    // Drop zone
-    sentenceArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        sentenceArea.classList.add('drag-over');
-    });
-
-    sentenceArea.addEventListener('dragleave', () => {
-        sentenceArea.classList.remove('drag-over');
-    });
-
-    sentenceArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        sentenceArea.classList.remove('drag-over');
-        
-        if (draggedElement && draggedElement.parentElement === wordsPool) {
-            const word = draggedElement.dataset.word;
-            droppedWords.push(word);
-            draggedElement.remove();
-            
-            const sentenceWord = document.createElement('span');
-            sentenceWord.className = 'sentence-word';
-            sentenceWord.textContent = word;
-            sentenceWord.dataset.word = word;
-            
-            sentenceArea.querySelector('p').style.display = 'none';
-            sentenceArea.appendChild(sentenceWord);
-        }
-    });
-
-    // Кнопка очистки
-    document.getElementById('clearSentence').addEventListener('click', () => {
-        const sentenceWords = sentenceArea.querySelectorAll('.sentence-word');
-        sentenceWords.forEach(sw => {
-            const word = sw.dataset.word;
-            const chip = document.createElement('div');
-            chip.className = 'word-chip';
-            chip.draggable = true;
-            chip.dataset.word = word;
-            chip.textContent = word;
-            chip.addEventListener('dragstart', (e) => {
-                draggedElement = chip;
-                chip.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-            });
-            chip.addEventListener('dragend', () => {
-                chip.classList.remove('dragging');
-            });
-            wordsPool.appendChild(chip);
-        });
-        
-        sentenceArea.innerHTML = '<p style="color: var(--text-light);">Перетащите слова сюда, чтобы составить предложение</p>';
-        droppedWords.length = 0;
-    });
-
-    // Проверка предложения
-    document.getElementById('checkSentence').addEventListener('click', () => {
-        const feedbackDiv = document.getElementById('sentenceFeedback');
-        const userSentence = Array.from(sentenceArea.querySelectorAll('.sentence-word'))
-            .map(sw => sw.dataset.word)
-            .join(' ')
-            .toLowerCase();
-        const correctSentence = sentenceData.correctSentence.toLowerCase();
-
-        if (userSentence === correctSentence) {
-            feedbackDiv.innerHTML = `
-                <div class="feedback correct" style="display: block; text-align: center; padding: 1.5rem;">
-                    ✅ Правильно! Отличная работа!
-                </div>
-            `;
-        } else {
-            feedbackDiv.innerHTML = `
-                <div class="feedback incorrect" style="display: block; text-align: center; padding: 1.5rem;">
-                    ❌ Неправильно. Попробуйте еще раз!<br>
-                    <small style="margin-top: 0.5rem; display: block;">
-                        Правильный ответ: ${sentenceData.correctSentence}
-                    </small>
-                </div>
-            `;
-        }
-    });
-
-    // Следующее задание
-    const nextBtn = document.getElementById('nextSentence');
-    if (nextBtn) {
-        nextBtn.addEventListener('click', () => {
-            if (currentSentenceIndex < sentenceBuilderData.length - 1) {
-                currentSentenceIndex++;
-                renderSentenceBuilder();
-            }
-        });
-    }
-}
 
